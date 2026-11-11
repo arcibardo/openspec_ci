@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Deterministic OpenSpec checks used by the workflows. No agent logic lives here.
+#
+# Usage: scripts/openspec-ops.sh <command> [args]
+#
+# Commands
+#   change-id <task-id>        print the single change in openspec/changes/ named <task-id>-*
+#   validate <change-id>       openspec validate <change-id> --strict
+#   tasks-complete <change-id> fail if tasks.md is missing or has unticked "- [ ]" items
+#   guard-plan-diff [base-ref] fail if the working tree (and base-ref...HEAD, if given) touches
+#                              anything outside openspec/ (.openspec-ci/ is ignored)
+#   manifest <key=value>...    create/merge .openspec-ci/manifest.json (sets created_at once,
+#                              updated_at always)
+# Exit codes
+#   0 ok | 1 usage/setup error | 2 check failed
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+die()  { echo "openspec-ops: $*" >&2; exit 1; }
+fail() { echo "openspec-ops: FAIL: $*" >&2; exit 2; }
+need() { command -v "$1" >/dev/null || die "$1 not installed"; }
+
+valid_change_id() { [[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "invalid change-id: '$1'"; }
+
+cmd_change_id() {
+  local task_id="${1:-}"
+  [[ "$task_id" =~ ^task-[0-9]+$ ]] || die "task-id must look like task-N"
+  need openspec; need jq
+  local matches count
+  matches="$(openspec list --json --sort name | jq -r --arg p "$task_id-" \
+    '.changes[].name | select(startswith($p))')"
+  count="$(grep -c . <<<"$matches" || true)"
+  case "$count" in
+    0) fail "no change named $task_id-* in openspec/changes/" ;;
+    1) echo "$matches" ;;
+    *) fail "several changes match $task_id-*: $(tr '\n' ' ' <<<"$matches")" ;;
+  esac
+}
+
+cmd_validate() {
+  local change_id="${1:-}"; valid_change_id "$change_id"
+  need openspec
+  openspec validate "$change_id" --type change --strict --no-interactive || fail "validation of $change_id"
+}
+
+cmd_tasks_complete() {
+  local change_id="${1:-}"; valid_change_id "$change_id"
+  local file="openspec/changes/$change_id/tasks.md"
+  [[ -f "$file" ]] || fail "$file not found"
+  local open
+  open="$(grep -nE '^[[:space:]]*- \[ \]' "$file" || true)"
+  if [[ -n "$open" ]]; then
+    echo "$open" >&2
+    fail "$(grep -c . <<<"$open") unticked task(s) in $file"
+  fi
+  grep -qE '^[[:space:]]*- \[[xX]\]' "$file" || fail "no tasks found in $file"
+  echo "openspec-ops: all tasks complete in $file" >&2
+}
+
+cmd_guard_plan_diff() {
+  local base="${1:-}" paths
+  paths="$(git status --porcelain --untracked-files=all | cut -c4- | sed 's/.* -> //')"
+  if [[ -n "$base" ]]; then
+    git rev-parse --verify --quiet "$base^{commit}" >/dev/null || die "unknown base ref: $base"
+    paths+=$'\n'"$(git diff --name-only "$base...HEAD")"
+  fi
+  local outside
+  outside="$(grep -v '^$' <<<"$paths" | sort -u | grep -vE '^(openspec/|\.openspec-ci/)' || true)"
+  if [[ -n "$outside" ]]; then
+    echo "$outside" >&2
+    fail "planning touched files outside openspec/"
+  fi
+  echo "openspec-ops: plan diff is confined to openspec/" >&2
+}
+
+cmd_manifest() {
+  [[ $# -gt 0 ]] || die "manifest needs at least one key=value"
+  need jq
+  local file=".openspec-ci/manifest.json" now kv key
+  mkdir -p .openspec-ci
+  [[ -f "$file" ]] || echo '{}' > "$file"
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  local args=(--arg now "$now") filter='.'
+  local i=0
+  for kv in "$@"; do
+    [[ "$kv" == *=* ]] || die "expected key=value, got '$kv'"
+    key="${kv%%=*}"
+    [[ "$key" =~ ^[a-z][a-z0-9_]*$ ]] || die "invalid key: '$key'"
+    args+=(--arg "k$i" "$key" --arg "v$i" "${kv#*=}")
+    filter+=" | .[\$k$i] = \$v$i"
+    i=$((i + 1))
+  done
+  filter+=' | .created_at //= $now | .updated_at = $now'
+  local tmp; tmp="$(mktemp)"
+  jq "${args[@]}" "$filter" "$file" > "$tmp" && mv "$tmp" "$file"
+  cat "$file"
+}
+
+command="${1:-}"; shift || true
+case "$command" in
+  change-id)       cmd_change_id "$@" ;;
+  validate)        cmd_validate "$@" ;;
+  tasks-complete)  cmd_tasks_complete "$@" ;;
+  guard-plan-diff) cmd_guard_plan_diff "$@" ;;
+  manifest)        cmd_manifest "$@" ;;
+  *) die "usage: $0 <change-id|validate|tasks-complete|guard-plan-diff|manifest> [args]" ;;
+esac

@@ -36,3 +36,17 @@
 
 ## Handoff
 Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
+
+## Step 5 (openspec-ops.sh) — new session after /clear
+- Skills listed as relevant: `ci-cd-and-automation`, `security-and-hardening`,
+  `git-workflow-and-versioning`. None were invoked; the conventions were applied directly
+  (input validation for task/change ids and manifest keys, exit codes 0/1/2).
+- Wrote `scripts/openspec-ops.sh`: `change-id`, `validate`, `tasks-complete`, `guard-plan-diff [base]`,
+  `manifest key=value...`. Decision (user-approved): gitignore `.openspec-ci/runs/`, commit only
+  `manifest.json`; reports go to PR comments and workflow artifacts.
+- Tested against a copy of the run-3 change (`task-1-version-footer`): every pass/fail path behaved
+  as expected, including 0/1/2 matches, strict validate, unticked/ticked tasks, a `src/` edit caught
+  by the guard, and a manifest merge. The guard's passing case was tested in a temp git worktree. The
+  copy was removed afterwards.
+- `openspec list --json` shape: `{ "changes": [{ "name": ... }], "root": {...} }`.
+- Commit `006` after the user approves.

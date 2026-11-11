@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OpenSpec CI: local/raw agent output (manifest.json is committed on PR branches)
+.openspec-ci/runs/
