@@ -9,6 +9,12 @@
 #   tasks-complete <change-id> fail if tasks.md is missing or has unticked "- [ ]" items
 #   guard-plan-diff [base-ref] fail if the working tree (and base-ref...HEAD, if given) touches
 #                              anything outside openspec/ (.openspec-ci/ is ignored)
+#   guard-diff <apply|reapply> <change-id> <base-sha>
+#                              check files changed since base-sha (working tree + untracked):
+#                              both modes forbid .github/ scripts/ tasks/ .claude/ openspec/specs/
+#                              openspec/config.yaml and other changes; apply also forbids this
+#                              change's artifacts except tasks.md. reapply prints the changed
+#                              artifacts (spec impact) on stdout.
 #   manifest <key=value>...    create/merge .openspec-ci/manifest.json (sets created_at once,
 #                              updated_at always)
 # Exit codes
@@ -75,6 +81,33 @@ cmd_guard_plan_diff() {
   echo "openspec-ops: plan diff is confined to openspec/" >&2
 }
 
+cmd_guard_diff() {
+  local mode="${1:-}" change_id="${2:-}" base="${3:-}"
+  [[ "$mode" =~ ^(apply|reapply)$ ]] || die "mode must be apply|reapply"
+  valid_change_id "$change_id"
+  git rev-parse --verify --quiet "$base^{commit}" >/dev/null || die "unknown base sha: '$base'"
+
+  local own="openspec/changes/$change_id/" paths path bad=() impact=()
+  paths="$( { git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    if [[ "$path" =~ ^(\.github/|scripts/|tasks/|\.claude/|openspec/specs/|openspec/config\.yaml$) ]]; then
+      bad+=("$path (protected)")
+    elif [[ "$path" == openspec/changes/* && "$path" != "$own"* ]]; then
+      bad+=("$path (another change)")
+    elif [[ "$path" == "$own"* && "$path" != "${own}tasks.md" ]]; then
+      if [[ "$mode" == apply ]]; then bad+=("$path (approved artifact)"); else impact+=("$path"); fi
+    fi
+  done <<<"$paths"
+
+  if [[ ${#bad[@]} -gt 0 ]]; then
+    printf '%s\n' "${bad[@]}" >&2
+    fail "$mode touched files it must not change"
+  fi
+  [[ ${#impact[@]} -gt 0 ]] && printf '%s\n' "${impact[@]}"
+  echo "openspec-ops: $mode diff OK ($(grep -c . <<<"$paths" || true) files, ${#impact[@]} artifact changes)" >&2
+}
+
 cmd_manifest() {
   [[ $# -gt 0 ]] || die "manifest needs at least one key=value"
   need jq
@@ -104,6 +137,7 @@ case "$command" in
   validate)        cmd_validate "$@" ;;
   tasks-complete)  cmd_tasks_complete "$@" ;;
   guard-plan-diff) cmd_guard_plan_diff "$@" ;;
+  guard-diff)      cmd_guard_diff "$@" ;;
   manifest)        cmd_manifest "$@" ;;
-  *) die "usage: $0 <change-id|validate|tasks-complete|guard-plan-diff|manifest> [args]" ;;
+  *) die "usage: $0 <change-id|validate|tasks-complete|guard-plan-diff|guard-diff|manifest> [args]" ;;
 esac

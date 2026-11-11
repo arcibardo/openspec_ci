@@ -43,6 +43,9 @@ Human merges.
 | D6 | Agent logic lives in `scripts/run-agent.sh` + `scripts/prompts/*.md`; OpenSpec checks in `scripts/openspec-ops.sh`. Workflows only orchestrate. | Layer separation from the reference task, kept minimal. |
 | D7 | Branch manifest `.openspec-ci/manifest.json` (task, change id, stage, status, run ids, SHAs). | Audit trail beyond transient logs. |
 | D8 | Out of scope: Jira, Codex/Copilot, act, archival, post-merge verify. | Verify the idea first. Archival can later be a step after a passing verify. |
+| D9 | Single model choice: a dropdown at Plan (`sonnet`/`opus`/`fable`), saved as manifest `model`; Apply, re-apply and Verify read it. | User decision (2026-11-11). PR events have no inputs; one choice per PR. |
+| D10 | Re-apply is triggered by a "Request changes" review (plus dispatch with `pr`). It reads only feedback newer than `applied_at` from users with write access. | User decision. Mirrors Approve → Verify; the commenter filter blocks prompt injection from outsiders. |
+| D11 | During re-apply the agent classifies feedback: requirement → `/opsx:update` (delta specs may change), implementation → new tasks in tasks.md. The report has a Spec impact table; `guard-diff` lists changed artifacts. | User decision. Delta specs are still in flight until archive; changing them through OpenSpec keeps Verify honest. |
 
 ## Required GitHub settings (manual, by the repo owner)
 

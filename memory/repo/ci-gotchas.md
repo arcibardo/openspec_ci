@@ -36,3 +36,12 @@ Learned from the first CI plan run (2026-11-11, run 43091589972):
 - Re-running a failed run keeps the run id, and both attempts upload an artifact with the same name.
   `gh run download <id>` then fails with "file exists" unless each attempt goes into a fresh
   directory. The manifest records `plan_run_attempt`.
+
+Learned building Apply (2026-11-11):
+- `pull_request` events check out the merge ref by default. Apply must check out the PR head branch
+  (`ref: <headRefName>`) so it can commit and push back to it.
+- A PR authored by `github-actions` can be approved or have changes requested by the repo owner
+  (GitHub blocks both on your own PRs), so the human gates work with bot-opened PRs.
+- `pnpm build` (tsc -b + vite) leaves no untracked files outside ignored dirs, so `git add -A` after
+  Apply only picks up the agent's changes, which `guard-diff` has already checked.
+- Local test harness on zsh: `$CMD args` with `CMD="bash x.sh"` does not word-split. Use a function.

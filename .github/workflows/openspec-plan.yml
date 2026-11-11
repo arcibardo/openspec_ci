@@ -68,9 +68,13 @@ jobs:
       - name: Write manifest
         env:
           CHANGE: ${{ steps.change.outputs.id }}
+          MODEL: ${{ inputs.model }}
         run: |
+          # model = the alias picked here; every later stage reads it (single point of choice).
+          # plan_model = what the run reported, kept for the record.
           model="$(jq -r '.modelUsage // {} | keys | join(",")' .openspec-ci/runs/plan.json)"
           scripts/openspec-ops.sh manifest task="$TASK" change="$CHANGE" stage=plan status=planned \
+            model="$MODEL" \
             plan_run_id="$GITHUB_RUN_ID" plan_run_attempt="$GITHUB_RUN_ATTEMPT" \
             plan_model="${model:-unknown}" base_sha="$GITHUB_SHA"
 

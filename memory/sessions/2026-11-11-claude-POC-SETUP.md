@@ -74,3 +74,21 @@ Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
 - Checked: YAML parse, `bash -n`, run-agent early failures (token with newline/space, bad model) and
   the summary jq against the real `plan.json`. No agent calls.
 - Commit `008` and push after the user approves.
+
+## Step 7a (commit 009): Apply workflow
+- User decisions: single model choice at Plan (D9); re-apply on "Request changes" (D10); the agent
+  classifies feedback and spec changes go through `/opsx:update` with a Spec impact table (D11).
+  Step 7 is split into 009 (first apply) and 010 (re-apply) so each can be tested on GitHub.
+- Skills used as guidance: `incremental-implementation` (the 7a/7b split), `ci-cd-and-automation`,
+  `security-and-hardening` (same-repo `openspec/task-N` only, non-draft and open PR, secret only on
+  the agent step, GH_TOKEN only on gh steps, `guard-diff` protects .github/scripts/tasks/.claude/main
+  specs/other changes).
+- Added `openspec-ops.sh guard-diff`. Tested 10 cases on a worktree of `origin/openspec/task-1`, all
+  as expected.
+- Plan workflow now also writes `model=<alias>`.
+- `openspec-apply.yml`: resolve and check the PR → checkout head → read manifest (model fallback:
+  model → plan_model → sonnet) → pnpm/tools → change-id + validate → agent apply → guard-diff →
+  tasks-complete/validate/build/lint → manifest (applied_at = run start) → commit/push/PR comment →
+  artifact (name includes run attempt) + summary.
+- Not run on GitHub yet. Handoff: `docs/PROGRESS.md` → "Next action".
+- Commit `009` and push after the user approves.

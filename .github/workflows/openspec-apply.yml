@@ -1,0 +1,186 @@
+# Stage 2 of the OpenSpec lifecycle: implement an approved change on its PR branch.
+# Trigger: a human marks the draft PR "Ready for review" (or a manual re-run with the PR number).
+# Model, task and change come from .openspec-ci/manifest.json (chosen once, at Plan).
+# Agent logic: scripts/run-agent.sh. Checks: scripts/openspec-ops.sh. This file only orchestrates.
+name: OpenSpec Apply
+
+on:
+  pull_request:
+    types: [ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number (branch openspec/task-N)"
+        required: true
+        type: string
+
+permissions:
+  contents: write        # push the implementation to the PR branch
+  pull-requests: write   # post the report as a PR comment
+
+concurrency:
+  group: openspec-apply-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash          # -eo pipefail
+
+jobs:
+  apply:
+    # Only same-repo openspec/task-N branches; the dispatch path is checked in "Resolve PR".
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.event.pull_request.head.ref, 'openspec/task-') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PR: ${{ github.event.pull_request.number || inputs.pr }}   # used via env only
+    steps:
+      - name: Resolve PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::pr must be a number"; exit 1; }
+          info="$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" \
+            --json headRefName,isCrossRepository,isDraft,state)"
+          head="$(jq -r .headRefName <<<"$info")"
+          [[ "$head" =~ ^openspec/task-[0-9]+$ ]] || { echo "::error::branch $head is not openspec/task-N"; exit 1; }
+          [[ "$(jq -r .isCrossRepository <<<"$info")" == false ]] || { echo "::error::fork PRs are not supported"; exit 1; }
+          [[ "$(jq -r .state <<<"$info")" == OPEN ]] || { echo "::error::PR #$PR is not open"; exit 1; }
+          [[ "$(jq -r .isDraft <<<"$info")" == false ]] || { echo "::error::PR #$PR is still a draft"; exit 1; }
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.pr.outputs.head }}   # the PR branch itself, not the merge ref
+
+      - name: Read manifest
+        id: m
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head }}
+        run: |
+          m=.openspec-ci/manifest.json
+          [[ -f "$m" ]] || { echo "::error::$m missing on $HEAD_REF"; exit 1; }
+          task="$(jq -r '.task // empty' "$m")"
+          change="$(jq -r '.change // empty' "$m")"
+          [[ "$HEAD_REF" == "openspec/$task" ]] || { echo "::error::manifest task '$task' does not match $HEAD_REF"; exit 1; }
+          # Single point of model choice: the alias picked at Plan. Older manifests only have
+          # plan_model (the resolved id); use it if it is a single model, else fall back to sonnet.
+          model="$(jq -r '.model // empty' "$m")"
+          if [[ -z "$model" ]]; then
+            model="$(jq -r '.plan_model // empty' "$m")"
+            [[ -z "$model" || "$model" == *,* ]] && model=sonnet
+          fi
+          echo "task=$task" >> "$GITHUB_OUTPUT"
+          echo "change=$change" >> "$GITHUB_OUTPUT"
+          echo "model=$model" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq -r '.apply_count // 0' "$m")" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies and tools
+        run: |
+          pnpm install --frozen-lockfile
+          npm install -g @fission-ai/openspec@1.14.1 @anthropic-ai/claude-code@2.1.322
+
+      - name: Check change before apply
+        env:
+          TASK: ${{ steps.m.outputs.task }}
+          CHANGE: ${{ steps.m.outputs.change }}
+        run: |
+          found="$(scripts/openspec-ops.sh change-id "$TASK")"
+          [[ "$found" == "$CHANGE" ]] || { echo "::error::manifest change '$CHANGE' != openspec change '$found'"; exit 1; }
+          scripts/openspec-ops.sh validate "$CHANGE"
+
+      - name: Run agent (apply)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_MODEL: ${{ steps.m.outputs.model }}
+          TASK: ${{ steps.m.outputs.task }}
+          CHANGE: ${{ steps.m.outputs.change }}
+        run: scripts/run-agent.sh apply "$TASK" "$CHANGE"
+
+      - name: Guard - apply changed only code and tasks.md
+        env:
+          CHANGE: ${{ steps.m.outputs.change }}
+          BASE_SHA: ${{ steps.m.outputs.base_sha }}
+        run: scripts/openspec-ops.sh guard-diff apply "$CHANGE" "$BASE_SHA"
+
+      - name: Check result (tasks, validate, build, lint)
+        env:
+          CHANGE: ${{ steps.m.outputs.change }}
+        run: |
+          scripts/openspec-ops.sh tasks-complete "$CHANGE"
+          scripts/openspec-ops.sh validate "$CHANGE"
+          pnpm build
+          pnpm lint
+
+      - name: Write manifest
+        env:
+          COUNT: ${{ steps.m.outputs.count }}
+          MODEL: ${{ steps.m.outputs.model }}
+          STARTED_AT: ${{ steps.pr.outputs.started_at }}
+        run: |
+          # applied_at = this run's start: re-apply reads review feedback newer than this.
+          scripts/openspec-ops.sh manifest stage=apply status=applied model="$MODEL" \
+            apply_run_id="$GITHUB_RUN_ID" apply_run_attempt="$GITHUB_RUN_ATTEMPT" \
+            applied_at="$STARTED_AT" apply_count="$((COUNT + 1))"
+
+      - name: Commit, push and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASK: ${{ steps.m.outputs.task }}
+          CHANGE: ${{ steps.m.outputs.change }}
+          HEAD_REF: ${{ steps.pr.outputs.head }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "openspec($TASK): apply $CHANGE"
+          git push origin "HEAD:$HEAD_REF"
+
+          body="$RUNNER_TEMP/comment.md"
+          { echo "## OpenSpec Apply: \`$CHANGE\`"; echo
+            if [[ -s .openspec-ci/runs/apply.md ]]; then cat .openspec-ci/runs/apply.md
+            else echo "(the agent returned no report)"; fi
+            printf '\n---\nGenerated by [OpenSpec Apply](%s). Approve to run Verify; ' "$RUN_URL"
+            printf 'request changes to re-apply with your review comments.\n'
+          } > "$body"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+
+      - name: Upload agent output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openspec-apply-pr${{ github.event.pull_request.number || inputs.pr }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .openspec-ci/runs/
+          if-no-files-found: ignore
+
+      - name: Job summary
+        if: always()
+        env:
+          CHANGE: ${{ steps.m.outputs.change }}
+          MODEL: ${{ steps.m.outputs.model }}
+        run: |
+          {
+            echo "### OpenSpec Apply: PR #$PR"
+            echo "- change: ${CHANGE:-n/a}"
+            if [[ -f .openspec-ci/runs/apply.json ]]; then
+              jq -r --arg req "$MODEL" '"- model: \(.modelUsage // {} | keys | join(", ")) (requested: \($req))",
+                     "- turns: \(.num_turns // "?"), cost_usd: \(.total_cost_usd // "?"), denials: \(.permission_denials // [] | length)"' \
+                .openspec-ci/runs/apply.json || true
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
