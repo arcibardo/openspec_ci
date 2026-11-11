@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Agent execution adapter: runs one lifecycle stage with Claude Code in headless mode.
 #
-# Usage: scripts/run-agent.sh <plan|apply|verify> <task-id> [change-id]
+# Usage: scripts/run-agent.sh <plan|apply|reapply|verify> <task-id> [change-id]
 #
 # Inputs
 #   task-id     e.g. task-1 (reads tasks/<task-id>.txt)
-#   change-id   OpenSpec change name; required for apply and verify
+#   change-id   OpenSpec change name; required for apply, reapply and verify
 # Env
 #   CLAUDE_CODE_OAUTH_TOKEN  subscription token (CI). Locally, the logged-in session is used.
 #   CLAUDE_MODEL             optional model override
 #   OPENSPEC_CI_OUT          output dir (default .openspec-ci/runs)
+#   OPENSPEC_CI_FEEDBACK     reapply only: review feedback file (scripts/pr-feedback.sh output)
 # Outputs (in $OPENSPEC_CI_OUT)
 #   <stage>.json   raw `claude --output-format json` result (cost, turns, session id)
 #   <stage>.md     the agent's final message (report)
@@ -23,10 +24,15 @@ cd "$root"
 
 die() { echo "run-agent: $*" >&2; exit 1; }
 
-[[ "$stage" =~ ^(plan|apply|verify)$ ]] || die "stage must be plan|apply|verify"
+[[ "$stage" =~ ^(plan|apply|reapply|verify)$ ]] || die "stage must be plan|apply|reapply|verify"
 [[ "$task_id" =~ ^task-[0-9]+$ ]] || die "task-id must look like task-N"
 [[ -f "tasks/$task_id.txt" ]] || die "tasks/$task_id.txt not found"
 if [[ "$stage" != plan && -z "$change_id" ]]; then die "change-id required for $stage"; fi
+feedback="${OPENSPEC_CI_FEEDBACK:-}"
+if [[ "$stage" == reapply ]]; then
+  [[ -s "$feedback" ]] || die "OPENSPEC_CI_FEEDBACK must point to a non-empty file for reapply"
+  [[ "$feedback" =~ ^[A-Za-z0-9._/-]+$ ]] || die "unsafe OPENSPEC_CI_FEEDBACK path"
+fi
 
 command -v claude >/dev/null || die "claude CLI not installed"
 command -v jq >/dev/null || die "jq not installed"
@@ -47,11 +53,12 @@ fi
 common_ro=(Read Glob Grep Skill "Bash(openspec:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git status:*)" "Bash(ls:*)")
 case "$stage" in
   plan)   tools=("${common_ro[@]}" "Write(openspec/**)" "Edit(openspec/**)") ;;
-  apply)  tools=("${common_ro[@]}" Write Edit "Bash(pnpm build)" "Bash(pnpm lint)" "Bash(pnpm install:*)") ;;
+  apply|reapply) tools=("${common_ro[@]}" Write Edit "Bash(pnpm build)" "Bash(pnpm lint)" "Bash(pnpm install:*)") ;;
   verify) tools=("${common_ro[@]}" "Bash(pnpm build)" "Bash(pnpm lint)") ;;
 esac
 
 prompt="$(sed -e "s|{{TASK_ID}}|$task_id|g" -e "s|{{CHANGE_ID}}|$change_id|g" \
+  -e "s|{{FEEDBACK_FILE}}|$feedback|g" \
   "scripts/prompts/$stage.md")"
 
 out="${OPENSPEC_CI_OUT:-.openspec-ci/runs}"

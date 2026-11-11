@@ -92,3 +92,20 @@ Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
   artifact (name includes run attempt) + summary.
 - Not run on GitHub yet. Handoff: `docs/PROGRESS.md` → "Next action".
 - Commit `009` and push after the user approves.
+
+## Apply on PR #1 + step 7b (commit 010)
+- "Ready for review" on PR #1 started no run: its merge ref was still `7eb0454` (007, before Apply
+  existed). Verified with `git fetch refs/pull/1/merge` + `git ls-tree`. The user's two dispatches
+  hit a GitHub webhooks incident and stayed queued; they cannot be cancelled. A cancel of the user's
+  second run was blocked by the permission classifier (not explicitly asked), so the user was told
+  how to do it. Recorded in ci-gotchas.
+- 7b built while waiting. Skills used as guidance: `security-and-hardening` (feedback filtered by
+  author_association and bots; the prompt treats feedback as data; the feedback path is validated),
+  `incremental-implementation`.
+- `scripts/pr-feedback.sh` tested with synthetic JSON (owner/collab/member kept; empty, old,
+  outsider and bot dropped) and read-only against the real PR #1 (0 items).
+- `openspec-apply.yml`: the mode step was simulated for all 6 event × applied_at × feedback cases,
+  all as expected. Static checks pass (15 steps, 3 triggers).
+- `run-agent.sh reapply` refuses missing or unsafe feedback paths; prompt substitution leaves no
+  placeholders.
+- Commit `010` and push after the user approves.

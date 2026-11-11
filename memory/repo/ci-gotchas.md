@@ -45,3 +45,15 @@ Learned building Apply (2026-11-11):
 - `pnpm build` (tsc -b + vite) leaves no untracked files outside ignored dirs, so `git add -A` after
   Apply only picks up the agent's changes, which `guard-diff` has already checked.
 - Local test harness on zsh: `$CMD args` with `CMD="bash x.sh"` does not word-split. Use a function.
+
+Learned testing Apply on PR #1 (2026-11-11):
+- `pull_request` / `pull_request_review` workflows run from the PR's **merge ref**
+  (`refs/pull/N/merge`). GitHub rebuilds it lazily, so a PR opened before a workflow existed (or
+  an event fired seconds after the push to main) silently starts nothing: no run, no error.
+  Check with `git fetch origin refs/pull/N/merge` + `git ls-tree` on `.github/workflows/`.
+  Fallback: `gh workflow run "OpenSpec Apply" -f pr=N` (dispatch runs from main). This hits every
+  new workflow in this POC on existing PRs.
+- During a GitHub webhooks incident, dispatched runs stayed `queued` with no jobs. `gh run cancel`
+  said "completed", `force-cancel` said "not queued yet" (409), and `gh run delete` gave a 403,
+  even after the incident was resolved. Leave them to expire (~24h) or contact GitHub Support. Runs with no jobs have not used any Claude quota.
+- `gh api --help | grep` output is swallowed by the local `rtk` hook. Write help to a file first.
