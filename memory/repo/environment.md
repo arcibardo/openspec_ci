@@ -13,3 +13,6 @@ description: Tool versions, repo layout and auth approach for the OpenSpec CI PO
 - CI auth: `claude setup-token` → secret `CLAUDE_CODE_OAUTH_TOKEN` (subscription, not API key).
 
 Related: [[ci-gotchas]]
+- OpenSpec skills/commands live in `.claude/` (Claude Code reads only there), not `.github/`.
+- A local `plan` run of task-1 took 21–41 turns on claude-fable-5-1 (notional $0.46–1.92 per the
+  JSON's `total_cost_usd`; charged to subscription quota).

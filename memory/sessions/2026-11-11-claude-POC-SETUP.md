@@ -12,3 +12,27 @@
 
 ## User rules observed
 - Every step after the OpenSpec init waits for approval before commit.
+
+## Step 4 (agent runner)
+- `claude --help` (2.1.322) checked. Used flags: `-p`, `--output-format json`,
+  `--permission-mode dontAsk`, `--allowedTools`, `--model`. No `--max-turns` in this version's help.
+- `--bare` NOT used: it limits auth to ANTHROPIC_API_KEY/apiKeyHelper, which breaks subscription
+  auth via CLAUDE_CODE_OAUTH_TOKEN.
+- Verify verdict is parsed from a final `VERDICT: PASS|FAIL|INCONCLUSIVE` line; missing = inconclusive.
+- Local run 1 (`plan task-1`): 21 turns, success, but every Bash call was denied (user `rtk`
+  hook + chained commands), so artifacts were hand-written without the CLI. Validated externally: OK.
+- Fix: `--setting-sources project` + one-command-per-call rule in prompts.
+- Local run 2: 38 turns, model claude-fable-5-1, `openspec validate --strict` ran and passed.
+  Only remaining denial: `Skill(opsx:propose)` → added `Skill` to the allowlist.
+- Local run 3: 41 turns, zero permission denials, `/opsx:propose` ran via Skill, strict validation passed.
+- Both generated changes copied to the session scratchpad and removed from the repo.
+- Run 3 change saved (outside the repo, session scratchpad, may be wiped):
+  /private/tmp/claude-501/-Users-davide-arcinotti-learn-openspec-ci/3611e8ae-6f27-4778-82c9-693e085de06c/scratchpad/run3-task-1-version-footer
+- Committed step 4 as `004`.
+
+## Decisions taken in this session
+- OpenSpec skills/commands stay in `.claude/` (Claude Code only reads skills from there; `.github/`
+  is for workflows and Copilot files). For Copilot later: `openspec init --tools claude,github-copilot`.
+
+## Handoff
+Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
