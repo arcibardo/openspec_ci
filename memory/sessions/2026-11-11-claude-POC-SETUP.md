@@ -50,3 +50,16 @@ Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
   copy was removed afterwards.
 - `openspec list --json` shape: `{ "changes": [{ "name": ... }], "root": {...} }`.
 - Commit `006` after the user approves.
+
+## Step 6 (openspec-plan.yml)
+- Skills used as guidance: `ci-cd-and-automation`, `security-and-hardening` (inputs only via `env:`,
+  explicit `permissions:`, secret scoped to the agent step only).
+- Wrote `.github/workflows/openspec-plan.yml`: dispatch with `task` → validate input + branch must not
+  exist → install pinned openspec 1.14.1 / claude-code 2.1.322 → run-agent plan → guard-plan-diff →
+  change-id + validate → manifest → branch `openspec/<task>`, commit, push, `gh pr create --draft`
+  (body = agent report + run link) → always upload runs/ artifact + job summary.
+- No pnpm in the plan job (no build needed). Checkout uses shallow history (the guard only reads the
+  working tree).
+- Checked statically only: PyYAML parse plus `bash -n` on every `run:` block, and an assert that no
+  `${{ }}` appears inside `run:`. Not run on GitHub yet (step 11).
+- Commit `007` after the user approves.
