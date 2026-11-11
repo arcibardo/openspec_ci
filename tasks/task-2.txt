@@ -1,0 +1,15 @@
+Title: Change the main heading text
+
+As a visitor, I want the main heading to describe this project, so that I know what I am looking at.
+
+Description:
+On the main page, the <h1> currently reads "Get started". Change it to "OpenSpec CI POC".
+
+Acceptance criteria:
+- The <h1> on the main page reads exactly "OpenSpec CI POC".
+- No other text on the page changes.
+- `pnpm build` and `pnpm lint` succeed.
+
+Out of scope:
+- Styling changes.
+- Changing the page <title> in index.html.

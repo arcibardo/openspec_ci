@@ -7,7 +7,8 @@ unchecked step. **Every step needs explicit user approval before it is committed
 |---|------|--------|--------|
 | 1 | `openspec init --tools claude` (openspec/, .claude/commands/opsx, .claude/skills/openspec-*) | done | 80603ac |
 | 2 | Plan, progress map, repo memory, session log | done | 953d591 (user) |
-| 3 | `tasks/task-1.txt` sample task | awaiting approval | |
+| 3 | `tasks/task-1.txt` sample task | done | 002 (4316fed) |
+| 3b | `tasks/task-{2,3,4}.txt` (heading text, counter reset, tab title) | awaiting approval | |
 | 4 | `scripts/run-agent.sh` + `scripts/prompts/{plan,apply,verify}.md` | todo | |
 | 5 | `scripts/openspec-ops.sh` (validate, tasks-complete check, change-id lookup, manifest) | todo | |
 | 6 | `.github/workflows/openspec-plan.yml` | todo | |
@@ -19,7 +20,8 @@ unchecked step. **Every step needs explicit user approval before it is committed
 
 ## Next action
 
-Step 3: wait for the user to approve `tasks/task-1.txt`, then commit. Then step 4 (agent runner).
+Step 3b: wait for the user to approve tasks 2–4, commit as `003`. Then step 4 (agent runner).
+Commit numbering convention: see `memory/repo/conventions.md`.
 
 ## Open questions
 

@@ -1,0 +1,18 @@
+Title: Add a reset button to the counter
+
+As a user, I want to reset the counter to zero, so that I can start counting again without
+reloading the page.
+
+Description:
+Next to the existing "Count is N" button on the main page, add a button labelled "Reset" that sets
+the count back to 0.
+
+Acceptance criteria:
+- A button labelled "Reset" is rendered next to the counter button.
+- Clicking "Reset" sets the counter to 0, and the counter button then reads "Count is 0".
+- Clicking "Reset" when the count is already 0 leaves it at 0.
+- `pnpm build` and `pnpm lint` succeed.
+
+Out of scope:
+- Persisting the count.
+- New styling beyond reusing the existing button class.

@@ -1,0 +1,16 @@
+Title: Set a descriptive browser tab title
+
+As a user with many tabs open, I want the browser tab to show the project name, so that I can find
+the app quickly.
+
+Description:
+The <title> in index.html should read "OpenSpec CI POC".
+
+Acceptance criteria:
+- index.html contains <title>OpenSpec CI POC</title>.
+- No other file changes.
+- `pnpm build` and `pnpm lint` succeed.
+
+Out of scope:
+- Favicon changes.
+- Dynamic titles set from React.
