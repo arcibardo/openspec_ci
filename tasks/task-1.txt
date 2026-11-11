@@ -1,0 +1,20 @@
+Title: Show the app version in a page footer
+
+As a user, I want to see which version of the app I am using, so that I can mention it when
+reporting a problem.
+
+Description:
+Add a footer at the bottom of the main page that shows the text "Version X.Y.Z", where X.Y.Z is
+the "version" field of package.json. The value must be read at build time, not hard-coded in a
+component.
+
+Acceptance criteria:
+- A <footer> element is rendered at the bottom of the main page.
+- It shows "Version " followed by the version from package.json (currently 0.0.0).
+- Changing the version in package.json and rebuilding changes the displayed text, with no other
+  code change.
+- `pnpm build` and `pnpm lint` succeed.
+
+Out of scope:
+- Styling beyond what is needed for the footer to be readable.
+- Showing a git SHA or build date.
