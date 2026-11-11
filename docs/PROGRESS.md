@@ -16,7 +16,8 @@ unchecked step. **Every step needs explicit user approval before it is committed
 | 8 | `.github/workflows/openspec-verify.yml` | todo | |
 | 9 | README: setup + run instructions | todo | |
 | 10 | User: push, add secret, change repo settings | done: pushed, secret set, Actions enabled, create/approve PRs allowed, default perms read (checked 2026-11-11) | |
-| 11 | E2E run: Plan → draft PR → Ready → Apply → Approve → Verify | todo | |
+| 6b | Plan workflow: `model` dropdown (sonnet/opus/fable), token whitespace check, model + attempt in manifest | done | 008 |
+| 11 | E2E run: Plan → draft PR → Ready → Apply → Approve → Verify | plan stage passed in CI (run 43091589972, attempt 2 → PR #1); apply/verify todo | |
 
 ## Next action
 
@@ -29,6 +30,10 @@ only on approval. Outline (`pull_request: types [ready_for_review]`, only for `o
 - `manifest stage=apply status=applied apply_run_id=… head_sha=…`, commit + push to the PR branch,
   PR comment with `.openspec-ci/runs/apply.md`; upload runs/ as artifact; job summary.
 - Reuse the plan workflow's patterns: inputs via `env:` only, `if: always()` artifact + summary.
+- Model: `ready_for_review` has no inputs, so Apply cannot show a dropdown. Proposal: default to
+  the plan's model (manifest `plan_model`) or `sonnet`; add `workflow_dispatch` (pr number + model
+  dropdown) for manual re-runs. Confirm with the user.
+- PR #1 (`openspec/task-1`, draft) is the first Apply test. It must stay draft until Apply exists.
 
 Plan workflow facts: actions pinned to `@v7` (checkout, setup-node, upload-artifact; latest
 majors on 2026-11-11), openspec `1.14.1`, claude-code `2.1.322`. Validated with PyYAML + `bash -n`

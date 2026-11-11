@@ -33,6 +33,14 @@ command -v jq >/dev/null || die "jq not installed"
 if [[ -n "${CI:-}" && -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
   die "CLAUDE_CODE_OAUTH_TOKEN is not set"
 fi
+# A token pasted from `claude setup-token` often carries a terminal line wrap. Never print it.
+if [[ "${CLAUDE_CODE_OAUTH_TOKEN:-}" =~ [[:space:]] ]]; then
+  die "CLAUDE_CODE_OAUTH_TOKEN contains whitespace/line breaks; re-set the secret as one line"
+fi
+# Backstop for local runs; in CI the workflow dropdown already restricts the value.
+if [[ -n "${CLAUDE_MODEL:-}" && ! "$CLAUDE_MODEL" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  die "invalid CLAUDE_MODEL: '$CLAUDE_MODEL'"
+fi
 
 # Per-stage tool allowances. Planning may only write under openspec/; verify is read-only.
 # The workflow additionally checks the resulting diff (scripts/openspec-ops.sh).

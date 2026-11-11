@@ -9,6 +9,12 @@ on:
         description: "Task id (reads tasks/<task>.txt), e.g. task-1"
         required: true
         type: string
+      model:
+        description: "Claude model alias (latest model of that family)"
+        required: true
+        type: choice
+        default: sonnet
+        options: [sonnet, opus, fable]
 
 permissions:
   contents: write        # push the openspec/<task> branch
@@ -46,6 +52,7 @@ jobs:
       - name: Run agent (plan)
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_MODEL: ${{ inputs.model }}
         run: scripts/run-agent.sh plan "$TASK"
 
       - name: Guard - planning touched only openspec/
@@ -62,8 +69,10 @@ jobs:
         env:
           CHANGE: ${{ steps.change.outputs.id }}
         run: |
+          model="$(jq -r '.modelUsage // {} | keys | join(",")' .openspec-ci/runs/plan.json)"
           scripts/openspec-ops.sh manifest task="$TASK" change="$CHANGE" stage=plan status=planned \
-            plan_run_id="$GITHUB_RUN_ID" base_sha="$GITHUB_SHA"
+            plan_run_id="$GITHUB_RUN_ID" plan_run_attempt="$GITHUB_RUN_ATTEMPT" \
+            plan_model="${model:-unknown}" base_sha="$GITHUB_SHA"
 
       - name: Commit, push and open draft PR
         id: pr
@@ -106,13 +115,15 @@ jobs:
         env:
           CHANGE: ${{ steps.change.outputs.id }}
           PR_URL: ${{ steps.pr.outputs.url }}
+          MODEL: ${{ inputs.model }}
         run: |
           {
             echo "### OpenSpec Plan: $TASK"
             echo "- change: ${CHANGE:-n/a}"
             echo "- PR: ${PR_URL:-n/a}"
             if [[ -f .openspec-ci/runs/plan.json ]]; then
-              jq -r '"- turns: \(.num_turns // "?"), cost_usd: \(.total_cost_usd // "?"), denials: \(.permission_denials // [] | length)"' \
+              jq -r --arg req "$MODEL" '"- model: \(.modelUsage // {} | keys | join(", ")) (requested: \($req))",
+                     "- turns: \(.num_turns // "?"), cost_usd: \(.total_cost_usd // "?"), denials: \(.permission_denials // [] | length)"' \
                 .openspec-ci/runs/plan.json || true
             fi
           } >> "$GITHUB_STEP_SUMMARY"

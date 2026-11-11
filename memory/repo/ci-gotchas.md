@@ -25,3 +25,14 @@ Learned from local plan runs (2026-11-11):
 - Repo state checked 2026-11-11 via `gh api repos/mastrobardo/openspec_ci_test/actions/permissions/workflow`:
   Actions enabled, `default_workflow_permissions: read`, `can_approve_pull_request_reviews: true`.
   Workflows must therefore declare explicit `permissions:` (contents/pull-requests: write).
+
+Learned from the first CI plan run (2026-11-11, run 43091589972):
+- A `CLAUDE_CODE_OAUTH_TOKEN` pasted from `claude setup-token` can carry the terminal's line wrap.
+  Symptom: `turns=1 cost_usd=0 is_error=true`; the cause is in `.result` of `plan.json`
+  ("contains a line break"). Fix: `pbpaste | tr -d ' \r\n' | gh secret set CLAUDE_CODE_OAUTH_TOKEN`.
+  `run-agent.sh` now rejects whitespace in the token before calling the agent.
+- With no `--model`, CI used `claude-sonnet-5-5` (local runs used `claude-fable-5-1`). Workflows
+  therefore take a `model` dropdown (`sonnet`/`opus`/`fable` aliases; default `sonnet`).
+- Re-running a failed run keeps the run id, and both attempts upload an artifact with the same name.
+  `gh run download <id>` then fails with "file exists" unless each attempt goes into a fresh
+  directory. The manifest records `plan_run_attempt`.

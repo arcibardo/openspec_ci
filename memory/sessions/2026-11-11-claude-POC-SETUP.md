@@ -63,3 +63,14 @@ Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
 - Checked statically only: PyYAML parse plus `bash -n` on every `run:` block, and an assert that no
   `${{ }}` appears inside `run:`. Not run on GitHub yet (step 11).
 - Commit `007` after the user approves.
+
+## First CI plan run + step 6b
+- Run 43091589972 attempt 1 failed: the token secret had a line break (diagnosed from the artifact's
+  `plan.json` `.result`). The user re-set the secret; attempt 2 passed (21 turns, $0.20 notional,
+  claude-sonnet-5-5, 0 denials) and opened draft PR #1 with only `openspec/` + manifest.
+- User decision: model selection via a `choice` dropdown (`sonnet` default, `opus`, `fable` = the CLI's
+  aliases per `claude --help`); no `haiku`.
+- User feedback: when the user changes the plan, re-confirm before editing (an edit was rejected).
+- Checked: YAML parse, `bash -n`, run-agent early failures (token with newline/space, bad model) and
+  the summary jq against the real `plan.json`. No agent calls.
+- Commit `008` and push after the user approves.
