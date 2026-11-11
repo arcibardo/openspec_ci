@@ -1,0 +1,66 @@
+# OpenSpec-in-CI POC — Plan
+
+Goal: prove that an OpenSpec change lifecycle can be driven end to end by Claude Code running in
+GitHub Actions, authenticated with a personal Claude subscription, with humans gating each stage
+through normal PR actions.
+
+## Lifecycle
+
+```
+Actions tab: "OpenSpec Plan" (input: task=task-1)
+   │  reads tasks/task-1.txt
+   │  claude -p: explore + /opsx:propose  (planning artifacts only, no src/ edits)
+   │  openspec validate
+   │  branch openspec/task-1, commit, gh pr create --draft
+   ▼
+Draft PR  ── human reviews the proposal/specs/tasks ──
+   │  human clicks "Ready for review"
+   ▼
+"OpenSpec Apply"  (pull_request: ready_for_review)
+   │  claude -p: /opsx:apply  (works through tasks.md)
+   │  pnpm build && pnpm lint
+   │  commit + push to the PR branch
+   ▼
+── human reviews the code, approves ──
+   ▼
+"OpenSpec Verify" (pull_request_review: submitted, state=approved; also workflow_dispatch)
+   │  openspec validate --strict, all tasks ticked
+   │  claude -p: /opsx:verify  → report posted as PR comment
+   │  job status pass/fail (can be made a required check)
+   ▼
+Human merges.
+```
+
+## Decisions
+
+| # | Decision | Why |
+|---|----------|-----|
+| D1 | This repo is the POC; work happens on `main`. | User decision. |
+| D2 | Tasks are plain text files `tasks/task-N.txt`. | User decision; replaces Jira. |
+| D3 | Auth: `claude setup-token` → repo secret `CLAUDE_CODE_OAUTH_TOKEN`. | Uses the Claude subscription, no API key. |
+| D4 | Raw `claude` CLI (`claude -p`) in workflows, not `claude-code-action`. | Same invocation locally and in CI; transparent. |
+| D5 | GitHub Actions only, no `act`. | User decision. |
+| D6 | Agent logic lives in `scripts/run-agent.sh` + `scripts/prompts/*.md`; OpenSpec checks in `scripts/openspec-ops.sh`. Workflows only orchestrate. | Layer separation from the reference task, kept minimal. |
+| D7 | Branch manifest `.openspec-ci/manifest.json` (task, change id, stage, status, run ids, SHAs). | Audit trail beyond transient logs. |
+| D8 | Out of scope: Jira, Codex/Copilot, act, archival, post-merge verify. | Verify the idea first. Archival can later be a step after a passing verify. |
+
+## Required GitHub settings (manual, by the repo owner)
+
+1. Secret `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`).
+2. Settings → Actions → General → Workflow permissions: **Read and write**, and tick
+   **Allow GitHub Actions to create and approve pull requests**.
+3. Optional: branch protection on `main` requiring the "OpenSpec Verify" check.
+
+## Known gotchas
+
+- Events caused by `GITHUB_TOKEN` (push, PR create) do **not** trigger other workflows. Fine here,
+  because the gating events (ready for review, approval) are human actions.
+- A `pull_request_review` check is not the same as a `pull_request` check: for branch protection,
+  verify may also need a `pull_request: synchronize` trigger. Decide in step 5.
+- `claude -p` in CI needs tool permissions set non-interactively (`--allowedTools` /
+  `--permission-mode`). Verify the flags against `claude --help` before use.
+
+## Steps
+
+See `docs/PROGRESS.md` for status. Every step after the OpenSpec init waits for user approval
+before commit.
