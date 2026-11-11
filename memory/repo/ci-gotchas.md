@@ -22,3 +22,6 @@ Learned from local plan runs (2026-11-11):
   one command per call.
 - `/opsx:*` slash commands run through the `Skill` tool, which must be in `--allowedTools`.
 - Check `.permission_denials` in the `--output-format json` result after each run.
+- Repo state checked 2026-11-11 via `gh api repos/mastrobardo/openspec_ci_test/actions/permissions/workflow`:
+  Actions enabled, `default_workflow_permissions: read`, `can_approve_pull_request_reviews: true`.
+  Workflows must therefore declare explicit `permissions:` (contents/pull-requests: write).

@@ -15,12 +15,12 @@ unchecked step. **Every step needs explicit user approval before it is committed
 | 7 | `.github/workflows/openspec-apply.yml` | todo | |
 | 8 | `.github/workflows/openspec-verify.yml` | todo | |
 | 9 | README: setup + run instructions | todo | |
-| 10 | User: push, add secret, change repo settings | todo (user) | |
+| 10 | User: push, add secret, change repo settings | done: pushed, secret set, Actions enabled, create/approve PRs allowed, default perms read (checked 2026-11-11) | |
 | 11 | E2E run: Plan → draft PR → Ready → Apply → Approve → Verify | todo | |
 
 ## Next action
 
-**Step 5: `scripts/openspec-ops.sh`**. Write it, show it to the user, and commit as `005` only on approval.
+**Step 5: `scripts/openspec-ops.sh`**. Write it, show it to the user, and commit as `006` only on approval.
 Intended subcommands (the workflows call these; no agent logic inside):
 - `change-id <task-id>`: find the single change in `openspec/changes/` named `<task-id>-*`
   (`openspec list --json`); fail if there are none or several.
