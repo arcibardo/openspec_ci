@@ -18,28 +18,35 @@ unchecked step. **Every step needs explicit user approval before it is committed
 | 8 | `.github/workflows/openspec-verify.yml` | todo | |
 | 9 | README: setup + run instructions | todo | |
 | 10 | User: push, add secret, change repo settings | done: pushed, secret set, Actions enabled, create/approve PRs allowed, default perms read (checked 2026-11-11) | |
-| 11 | E2E run: Plan → draft PR → Ready → Apply → Approve → Verify | plan passed in CI (run 43091589972 attempt 2 → PR #1); apply/verify todo | |
+| 11 | E2E run: Plan → draft PR → Ready → Apply → Approve → Verify | plan passed in CI on the old repo (run 43091589972 → PR #1); then blocked by GitHub `startup_failure`; moved to `arcibardo/openspec_ci` | |
+| 11b | Move to `arcibardo/openspec_ci` (remote `origin`; old repo = remote `mastrobardo`), secret + PR permission set | done | 011 |
 
 ## Next action
 
-1. **Run Apply on PR #1 for the first time (the user does this).** Clicking "Ready for review"
-   (20:19:54Z) started nothing, because PR #1's merge ref was stale (see `ci-gotchas.md`). The two
-   dispatched runs (43095726545, 43095829699) got stuck in `queued` during a GitHub webhooks
-   incident and could not be cancelled. If they are still pending, cancel them, then start
-   **one** run:
-   `gh workflow run "OpenSpec Apply" -f pr=1` → expect mode `apply` (no `applied_at` yet) and model
-   `sonnet` (manifest from before 008). It should push `openspec(task-1): apply …` and post a PR comment.
-   If it fails: `gh run download <id> -D <fresh dir>` and read `.result` / `.permission_denials`
-   in `apply.json`.
-2. **Test re-apply (the user does this):** on PR #1, "Request changes" with at least one comment
-   (e.g. an inline style nit and a requirement such as "also show the git SHA"). The review event
-   may not start a run because of the stale merge ref; if so, dispatch `pr=1` again (mode `reapply`
-   because `applied_at` is set and feedback exists). Expected: a re-apply comment with a Spec
-   impact box, follow-up tasks in tasks.md, and specs changed only for requirement items.
-3. **Step 8: Verify** (commit `011`, plan to be shown first): `pull_request_review` approved (+
-   dispatch `pr`), model from the manifest, `tasks-complete` + `validate` + `run-agent.sh verify`
-   (read-only), report as PR comment, exit 3/4 = failed check. Same merge-ref caveat: dispatch is the
-   fallback. Open question: also run on `synchronize` so it can be a required check?
+**Blocked on GitHub (as of 2026-11-11 ~21:00Z).** Every workflow run fails with `startup_failure` and
+no jobs, on both the old repo and the new account/repo. This is a GitHub-side problem: the
+byte-identical 007 Plan workflow that succeeded at 19:54Z fails the same way (see `ci-gotchas.md`).
+The project moved to `arcibardo/openspec_ci` (see `memory/repo/environment.md`).
+
+1. **Retry one Plan run on the new repo** (user or agent, uses quota if it starts):
+   `gh workflow run "OpenSpec Plan" -R arcibardo/openspec_ci -f task=task-1 -f model=sonnet`.
+   Check with `gh api 'repos/arcibardo/openspec_ci/actions/runs?per_page=3'` (the list endpoint,
+   not the single-run one). If it still fails at startup a day later, contact GitHub Support with run
+   ids 43098031317 (old repo, `probe/007`) and 43098756576 (new repo).
+2. When Plan works: it opens draft PR #1 **on the new repo** (the old PR #1 stays on the old repo,
+   abandoned). Then: mark it Ready → Apply runs. The PR is created after the workflows exist, so the
+   merge ref is not stale; keep dispatch `-f pr=N` as the fallback.
+3. Test re-apply: "Request changes" with comments (an inline nit + a requirement such as "also show
+   the git SHA"). Expected: a re-apply comment with a Spec impact box, follow-up tasks, and specs
+   changed only for requirement items.
+4. **Step 8: Verify** (plan to be shown first): `pull_request_review` approved (+ dispatch `pr`), model
+   from the manifest, `tasks-complete` + `validate` + `run-agent.sh verify` (read-only), report as a PR
+   comment, exit 3/4 = failed check, concurrency group shared with Apply per PR. Open question: also
+   run on `synchronize` so it can be a required check?
+
+Leftovers on the old repo (`mastrobardo/openspec_ci_test`): branch `probe/007`, PR #1, and
+uncancellable `startup_failure` runs. Deleting `probe/007` needs the `mastrobardo` gh account (the
+user decides).
 
 ## Facts for the next session
 

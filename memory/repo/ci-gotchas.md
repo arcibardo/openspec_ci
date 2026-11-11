@@ -56,4 +56,16 @@ Learned testing Apply on PR #1 (2026-11-11):
 - During a GitHub webhooks incident, dispatched runs stayed `queued` with no jobs. `gh run cancel`
   said "completed", `force-cancel` said "not queued yet" (409), and `gh run delete` gave a 403,
   even after the incident was resolved. Leave them to expire (~24h) or contact GitHub Support. Runs with no jobs have not used any Claude quota.
+- Those runs were in fact `completed/startup_failure`. The **list** endpoint
+  (`actions/runs?per_page=N`) showed that; the single-run endpoint and the UI kept saying
+  `queued`. Trust the list endpoint.
+- `startup_failure` on every run (Plan and Apply, old and new account) from ~20:20Z on 2026-11-11.
+  It was proven to be on GitHub's side by re-running the **byte-identical** Plan workflow from commit
+  007 (it succeeded at 19:54Z) on branch `probe/007`: it failed the same way. actionlint was clean,
+  all action tags existed, and all runtimes were node24. The run page showed no reason.
+  Method: when every run fails at startup, re-run a known-good commit before suspecting the code.
+- Lint workflows with `docker run --rm -v "$PWD":/repo:ro -w /repo rhysd/actionlint:1.7.7`.
+  It is clean apart from shellcheck style notes (SC2016 on intentional backticks).
+- zsh: quote `gh api` URLs that contain `?` (`'repos/o/r/actions/runs?per_page=3'`), otherwise
+  zsh treats them as a glob and fails with "no matches found" (a background poller died silently).
 - `gh api --help | grep` output is swallowed by the local `rtk` hook. Write help to a file first.

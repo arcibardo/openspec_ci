@@ -109,3 +109,18 @@ Next session starts at step 5. See `docs/PROGRESS.md` → "Next action".
 - `run-agent.sh reapply` refuses missing or unsafe feedback paths; prompt substitution leaves no
   placeholders.
 - Commit `010` and push after the user approves.
+
+## Debugging the stuck CI + move to a new repo (commit 011)
+- The dispatched Apply runs looked `queued`; cancel, force-cancel and delete all failed. The list
+  endpoint showed `completed/startup_failure`. My first theory (the phantoms hold the concurrency
+  group) was wrong. A no-quota Plan probe (`task-99`) also failed at startup, which ruled it out.
+- Ruled out: the GitHub incident (status "operational"), action tags, syntax (actionlint via
+  Docker), action runtimes. Decisive test: the byte-identical 007 Plan workflow on branch `probe/007`
+  also failed → GitHub-side.
+- The user created account `arcibardo` + repo `openspec_ci`. Remote `origin` → new repo, old repo
+  kept as remote `mastrobardo`. Pushed `main`. Created the secret with a placeholder; the user set
+  the value in the web UI and enabled "create/approve PRs". A real Plan run (43098756576) also failed
+  at startup.
+- Mistake: a background poller used an unquoted `?` URL in zsh and died silently. Recorded in
+  ci-gotchas.
+- Handoff: `docs/PROGRESS.md` → "Next action" (retry Plan on the new repo).
